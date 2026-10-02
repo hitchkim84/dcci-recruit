@@ -53,7 +53,7 @@
 1. Add new site → Import from GitHub → `hitchkim84/dcci-recruit`.
 2. Base directory: (비움 = 저장소 최상위), Build command: (비움), Publish directory: `public`, Functions directory: `netlify/functions` (`netlify.toml`에 이미 지정).
 3. Production branch: `main`.
-4. Environment variables (README 표 참고): `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`(Secret, Scopes=Functions, Deploy contexts=**Production만**), `TURNSTILE_SITE_KEY`, `STAFF_EMAIL_DOMAIN`.
+4. Environment variables (README 표 참고): `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`(Contains secret values 체크, Values는 **Different value for each deploy context**로 바꾸고 **Production 칸에만 값**·나머지 비움. Scopes 변경은 유료 플랜 기능이라 무료 플랜에서는 기본값 유지 — 빌드 단계가 없어 실제 사용처는 Functions뿐), `TURNSTILE_SITE_KEY`, `STAFF_EMAIL_DOMAIN`.
    - 공개 저장소이므로 외부인 PR의 Deploy Preview가 서버 키를 읽지 못하게 Production에만 둔다. 미리보기 확인이 필요하면 별도 테스트용 Supabase 프로젝트 값을 Deploy Preview 범위에 넣는다.
 5. 도메인 연결(Domain management) 후 HTTPS 확인.
 6. Functions → `purge`가 Scheduled로 표시되는지 확인(매일 03:10 KST).

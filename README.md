@@ -38,7 +38,7 @@ npm run dev                 # 로컬 개발 서버 http://localhost:8888 (가상
 |---|---|---|
 | `SUPABASE_URL` | 예 | Supabase 프로젝트 주소 |
 | `SUPABASE_ANON_KEY` | 예 | 공개용 키(anon 또는 publishable). 브라우저에도 내려간다 |
-| `SUPABASE_SERVICE_ROLE_KEY` | 예 | **서버 전용** 키(service_role 또는 secret). Secret 표시, Functions 범위, Production에만 |
+| `SUPABASE_SERVICE_ROLE_KEY` | 예 | **서버 전용** 키(service_role 또는 secret). Secret 표시, Deploy context는 Production에만(무료 플랜은 Scopes 변경 불가) |
 | `TURNSTILE_SITE_KEY` | 운영 필수 | Cloudflare Turnstile 사이트 키(공개값). 비밀 키는 Supabase 대시보드에 넣는다 |
 | `STAFF_EMAIL_DOMAIN` | 예 | 일반 담당자 로그인용 가상 이메일 도메인(예: `staff.채용사이트도메인`). 메일을 받지 않는 주소 |
 | `SITE_ORIGIN` | 선택 | 다른 주소에서 API를 부를 때만 CORS 허용 주소(보통 비워 둠, 같은 주소에서만 호출) |
