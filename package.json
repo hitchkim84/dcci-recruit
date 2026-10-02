@@ -4,7 +4,7 @@
   "private": true,
   "description": "대구상공회의소 채용 홈페이지 (Netlify + Supabase)",
   "scripts": {
-    "test": "node --test tests/unit/",
+    "test": "node --test tests/unit/*.test.js",
     "test:db": "bash tests/db/run.sh",
     "test:e2e": "node tests/e2e/run.js",
     "dev": "node tests/e2e/devserver.js"
