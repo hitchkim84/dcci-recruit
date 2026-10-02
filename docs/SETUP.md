@@ -17,7 +17,7 @@
 ## 1. Supabase
 1. 조직(예: DCCI_EDU)에서 **새 프로젝트** 생성(지역: Northeast Asia (Seoul)). DB 비밀번호는 회사가 관리하는 곳에 보관.
 2. SQL Editor에서 `sql/01_schema.sql` → `02_common_public.sql` → `03_applicant.sql` → `04_admin.sql` → `05_server_only.sql` 순서로 각각 붙여 넣고 실행. (여러 번 실행해도 안전)
-3. `sql/check_security.sql` 실행 → '확인 필요'가 없는지 확인(공고가 없으면 10번은 정상).
+3. `sql/check_security.sql` 실행 → '확인 필요'가 없는지 확인. 9·12번은 `참고`(12번 `rls_auto_enable`은 프로젝트 생성 시 Enable automatic RLS가 만든 이벤트 트리거 함수로, API로 호출할 수 없어 정상).
 4. **Authentication → Sign In / Providers → Email**
    - Enable Email provider: 켬, Confirm email: 켬, Allow new users to sign up: **켬**(지원자 이메일 인증에 필요)
    - Email OTP Expiration: 600초(10분) 권장, OTP Length: 6

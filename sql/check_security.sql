@@ -27,6 +27,7 @@ WITH tbl AS (
               THEN '정상' ELSE '확인 필요' END
     FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
    WHERE n.nspname = 'public' AND has_function_privilege('anon', p.oid, 'EXECUTE')
+     AND p.prorettype <> 'event_trigger'::regtype  -- 이벤트 트리거 함수는 API로 호출할 수 없다(12번에 따로 표시)
   UNION ALL
   -- 5) 서버 전용 함수는 로그인 사용자도 실행할 수 없어야 한다
   SELECT 5, '서버 전용 함수를 authenticated가 실행 가능: ' || coalesce(string_agg(p.proname, ', '), '없음'),
@@ -40,6 +41,7 @@ WITH tbl AS (
          CASE WHEN count(*) = 0 THEN '정상' ELSE '확인 필요' END
     FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
    WHERE n.nspname = 'public' AND p.prosecdef AND NOT coalesce(p.proconfig::text[] && ARRAY['search_path=""', 'search_path='], false)
+     AND p.prorettype <> 'event_trigger'::regtype
   UNION ALL
   -- 7) 첨부파일 저장소는 비공개여야 한다
   SELECT 7, '첨부 저장소 비공개(applicant-files)',
@@ -61,5 +63,11 @@ WITH tbl AS (
   UNION ALL
   -- 11) 지우지 못한 파일
   SELECT 11, '삭제 대기 파일: ' || count(*) || '개', CASE WHEN count(*) = 0 THEN '정상' ELSE '확인 필요' END FROM public.pending_file_deletes
+  UNION ALL
+  -- 12) 이벤트 트리거 함수(예: 프로젝트 생성 시 'Enable automatic RLS'가 만든 rls_auto_enable).
+  --     표를 만들 때 DB가 스스로 실행하며, 홈페이지 키로 호출하면 PostgreSQL이 거절한다(위험 없음).
+  SELECT 12, '이벤트 트리거 함수(API로 호출 불가): ' || coalesce(string_agg(p.proname, ', '), '없음'), '참고'
+    FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname = 'public' AND p.prorettype = 'event_trigger'::regtype
 )
 SELECT no, 점검, 상태 FROM checks ORDER BY no, 점검;
