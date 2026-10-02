@@ -20,7 +20,7 @@
 3. `sql/check_security.sql` 실행 → '확인 필요'가 없는지 확인. 9·12번은 `참고`(12번 `rls_auto_enable`은 프로젝트 생성 시 Enable automatic RLS가 만든 이벤트 트리거 함수로, API로 호출할 수 없어 정상).
 4. **Authentication → Sign In / Providers → Email**
    - Enable Email provider: 켬, Confirm email: 켬, Allow new users to sign up: **켬**(지원자 이메일 인증에 필요)
-   - Email OTP Expiration: 600초(10분) 권장, OTP Length: 6
+   - (Auth Providers → Email) Email OTP Expiration: 600초(10분), Email OTP Length: 8 (화면은 6~10자리 모두 받음)
 5. **Authentication → Emails → Templates → Magic Link**: 본문에 인증코드가 보이게 `{{ .Token }}`을 넣는다(링크 대신 코드 입력 방식). 예:
    ```
    <h2>대구상공회의소 채용 지원 인증코드</h2>
