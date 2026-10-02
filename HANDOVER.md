@@ -3,7 +3,7 @@
 마지막 갱신: 2026-10-02 · 기준 브랜치: `main`
 
 ## 1. 현재 상태 한 줄 요약
-첫 운영 버전의 **코드와 로컬 검증은 끝났다**. Supabase 프로젝트 `dcci-recruit`(서울) 생성·SQL 01~05 실행·점검 정상(2026-10-02), 이메일 OTP 8자리·10분 설정, SMTP는 임시 Gmail로 설정 중. Netlify 사이트·Turnstile·슈퍼관리자 계정은 아직(운영 확인 미실시).
+첫 운영 버전의 **코드와 로컬 검증은 끝났다**. 실제 환경(2026-10-02): Supabase 조직 `DCCI` / 프로젝트 `dcci-recruit`(서울) — SQL 01~05·점검 정상, 이메일 OTP 8자리·10분, SMTP 임시 Gmail, 메일 템플릿 `{{ .Token }}`, 슈퍼관리자 1명, CAPTCHA(Turnstile) 켬. Netlify `dcci-recruit.netlify.app`(회사 Netlify 팀, GitHub는 hitchkim84로 연결) — 환경변수 설정, 서버 키는 Production 컨텍스트에만. 관리자 로그인+OTP+로봇 확인 동작 확인. **남은 것: 운영 점검표(지원자 실제 메일 인증·업로드·제출·담당자 권한·링크 만료), 도메인, 기관 자료.**
 
 ## 2. 이어서 작업하는 방법
 ```bash
