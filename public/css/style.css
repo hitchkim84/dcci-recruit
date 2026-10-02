@@ -235,3 +235,4 @@ input:focus, select:focus, textarea:focus { border-color: var(--navy-2); outline
 @media (max-width: 720px) { .site-header { position: static; } }
 .preview h3 { margin-top: 20px; }
 .badge { white-space: nowrap; }
+.wrap.section { padding-left: 20px; padding-right: 20px; }
