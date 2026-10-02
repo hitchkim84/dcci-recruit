@@ -1,0 +1,21 @@
+{
+  "name": "dcci-recruit",
+  "version": "0.1.0",
+  "private": true,
+  "description": "대구상공회의소 채용 홈페이지 (Netlify + Supabase)",
+  "scripts": {
+    "test": "node --test tests/unit/",
+    "test:db": "bash tests/db/run.sh",
+    "test:e2e": "node tests/e2e/run.js",
+    "dev": "node tests/e2e/devserver.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.117.2"
+  },
+  "devDependencies": {
+    "pg": "^8.13.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
