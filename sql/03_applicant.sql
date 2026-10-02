@@ -96,6 +96,8 @@ BEGIN
   SELECT * INTO p FROM public.postings WHERE id = p_posting_id FOR UPDATE;
   PERFORM public.rc_require_open(p);
   IF p_consent IS NOT TRUE THEN RAISE EXCEPTION '개인정보 수집·이용에 동의해야 제출할 수 있습니다.'; END IF;
+  -- 동의문 없이 개인정보를 받지 않는다(담당자가 공고에 동의문을 입력해야 접수 가능)
+  IF btrim(p.consent_text) = '' THEN RAISE EXCEPTION '이 공고에 개인정보 수집·이용 동의문이 등록되지 않아 제출할 수 없습니다. 문의처로 연락해주세요.'; END IF;
   cleaned := public.rc_validate_application(p, p_data, true);
 
   SELECT * INTO a FROM public.applications WHERE posting_id = p_posting_id AND user_id = uid FOR UPDATE;

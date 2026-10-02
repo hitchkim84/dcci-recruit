@@ -84,8 +84,8 @@ before(async () => {
   await sys(`INSERT INTO auth.users (id, email, raw_app_meta_data) VALUES
     ($1,'a1@example.com','{}'),($2,'a2@example.com','{}'),($3,'admin@example.com','{"role":"admin"}'),
     ($4,'kim@staff.test','{"role":"staff"}'),($5,'lee@staff.test','{"role":"staff"}')`, [U.a1, U.a2, U.admin, U.staff, U.staff2]);
-  const ins = `INSERT INTO public.postings (id, title, status, fields, opens_at, closes_at, form_config, allow_edit, allow_cancel)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`;
+  const ins = `INSERT INTO public.postings (id, title, status, fields, opens_at, closes_at, form_config, allow_edit, allow_cancel, consent_text)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, '[테스트] 가상 동의문')`;
   const fields = JSON.stringify([{ name: '일반행정', headcount: '0명', duties: '' }, { name: '전산', headcount: '0명', duties: '' }]);
   await sys(ins, [P.open, '[테스트] 접수중', 'published', fields, new Date(Date.now() - 86400e3), new Date(Date.now() + 86400e3), fullConfig, false, true]);
   await sys(ins, [P.other, '[테스트] 다른 공고', 'published', '[]', new Date(Date.now() - 86400e3), new Date(Date.now() + 86400e3), {}, false, false]);
@@ -139,6 +139,12 @@ test('임시저장 → 복구 → 검증(알 수 없는 값 제거)', async () =
   assert.strictEqual(mine.application.data.basic.hacker, undefined, '정해지지 않은 항목은 저장하지 않는다');
   assert.strictEqual(mine.application.data.extra, undefined);
   assert.strictEqual(mine.application.data.education[0].evil, undefined);
+});
+
+test('동의문이 없는 공고는 제출 불가', async () => {
+  await sys(`UPDATE public.postings SET consent_text = '' WHERE id = $1`, [P.other]);
+  await rejects(call(C.a2, 'submit_application', [P.other, { basic: { name: 'x', phone: '01000000000' } }, true, 'h']), /동의문이 등록되지 않아/);
+  await sys(`UPDATE public.postings SET consent_text = '[테스트] 가상 동의문' WHERE id = $1`, [P.other]);
 });
 
 test('입력값 검증: 형식·길이·문항 글자 수·분야', async () => {

@@ -1,0 +1,67 @@
+# 대구상공회의소 채용 홈페이지 Netlify 설정 (Base directory = 저장소 최상위, 빌드 단계 없음)
+[build]
+  publish = "public"
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+
+# 자동 파기: 매일 03:10(한국 시간) = 18:10 UTC
+[functions."purge"]
+  schedule = "10 18 * * *"
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+# 보안 헤더 (모든 페이지)
+# CSP: 우리 사이트 파일 + Cloudflare 로봇 확인(Turnstile) + Supabase(로그인·파일 업로드)만 허용.
+#   인라인 스크립트·onclick 금지(코드는 public/js/*.js에만). 새 외부 주소가 필요하면 여기에 추가한다.
+#   style-src 'unsafe-inline'은 로봇 확인 위젯이 스타일을 넣기 때문에 허용한다(스크립트는 막혀 있음).
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.supabase.co; frame-src https://challenges.cloudflare.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=()"
+    Strict-Transport-Security = "max-age=31536000"
+
+# 지원서·지원내역·관리자 화면: 검색 노출 금지, 브라우저 캐시 금지
+[[headers]]
+  for = "/apply.html"
+  [headers.values]
+    X-Robots-Tag = "noindex"
+    Cache-Control = "no-store"
+[[headers]]
+  for = "/my.html"
+  [headers.values]
+    X-Robots-Tag = "noindex"
+    Cache-Control = "no-store"
+[[headers]]
+  for = "/admin.html"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+    Cache-Control = "no-store"
+[[headers]]
+  for = "/js/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+# 확장자 없이 들어온 주소(/apply, /my, /admin)에도 같은 헤더
+[[headers]]
+  for = "/apply"
+  [headers.values]
+    X-Robots-Tag = "noindex"
+    Cache-Control = "no-store"
+[[headers]]
+  for = "/my"
+  [headers.values]
+    X-Robots-Tag = "noindex"
+    Cache-Control = "no-store"
+[[headers]]
+  for = "/admin"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+    Cache-Control = "no-store"
