@@ -54,11 +54,12 @@
     var root = $('#modal-root');
     root.innerHTML = '<div class="modal-back" id="modal-back"><div class="modal" role="dialog" aria-modal="true">' +
       '<button type="button" class="btn small close no-print" id="modal-close">닫기</button>' + html + '</div></div>';
+    document.body.classList.add('modal-open'); // 인쇄 시 모달만 출력(css/style.css @media print)
     $('#modal-close').addEventListener('click', closeModal);
     $('#modal-back').addEventListener('click', function (e) { if (e.target.id === 'modal-back') closeModal(); });
     return root;
   }
-  function closeModal() { $('#modal-root').innerHTML = ''; }
+  function closeModal() { $('#modal-root').innerHTML = ''; document.body.classList.remove('modal-open'); }
   function stageOptions(selected, withAll) {
     return (withAll ? '<option value="">전체 단계</option>' : '') + Object.keys(R.STAGES).map(function (k) {
       return '<option value="' + k + '"' + (k === selected ? ' selected' : '') + '>' + esc(R.STAGES[k]) + '</option>';
@@ -281,6 +282,8 @@
           return '<div>' + chk('c-' + s + '-use', lab + ' 받기', c.use) + chk('c-' + s + '-req', lab + ' 필수', c.required) + '</div>';
         }).join('') + '</div>' +
         '<h3>자기소개 문항</h3><div id="p-essays">' + (fc.essays || []).map(essayRow).join('') + '</div><button type="button" class="btn small" id="add-essay">+ 문항 추가</button>' +
+        '<h3>증명사진</h3><div class="cfg-grid">' + chk('c-photo-use', '증명사진 받기(JPG·PNG 2MB, 1장)', (fc.photo || {}).use) + chk('c-photo-req', '증명사진 필수', (fc.photo || {}).required) + '</div>' +
+        '<p class="hint"><span class="review-needed">검토 필요</span> 채용절차법 제4조의3은 직무 수행에 필요하지 않은 용모·키·체중 등 신체적 조건 정보의 수집을 금지합니다(상시 30명 이상 사업장). 직무상 필요가 확인된 경우에만 켜세요. 기본값은 꺼짐입니다.</p>' +
         '<h3>첨부서류</h3><div id="p-docs-list">' + (fc.attachments || []).map(docRow).join('') + '</div><button type="button" class="btn small" id="add-doc">+ 서류 추가</button>' +
         '<div class="field"><label for="c-maxmb">파일당 최대 크기(MB, 1~10)</label><input id="c-maxmb" type="number" min="1" max="10" value="' + esc(fc.max_file_mb || 10) + '"></div></section>' +
         '<section class="form-section"><h2>접수 규칙·개인정보</h2>' +
@@ -330,6 +333,7 @@
       documents: $('#p-docs').value, contact: $('#p-contact').value, etc: $('#p-etc').value,
       form_config: {
         basic: { birth: $('#c-birth').checked, address: $('#c-address').checked, military: $('#c-military').checked },
+        photo: { use: $('#c-photo-use').checked, required: $('#c-photo-use').checked && $('#c-photo-req').checked },
         education: { use: $('#c-education-use').checked, required: $('#c-education-req').checked },
         career: { use: $('#c-career-use').checked, required: $('#c-career-req').checked },
         certs: { use: $('#c-certs-use').checked, required: $('#c-certs-req').checked },
@@ -462,13 +466,15 @@
       if (d.field) rows.push(['지원분야', d.field]);
       rows.push(['제출일시', RC.kst(a.submitted_at)], ['최종 수정', RC.kst(a.updated_at)], ['개인정보 동의', RC.kst(a.consent_at)]);
       var docs = fc.attachments || [];
-      var html = '<div class="print-area preview"><h2>입사지원서 — ' + esc(a.posting.title) + '</h2><dl>' + rows.map(function (x) { return '<dt>' + esc(x[0]) + '</dt><dd>' + esc(x[1] || '-') + '</dd>'; }).join('') + '</dl>' +
+      var photo = a.attachments.filter(function (f) { return f.doc_key === 'photo'; })[0];
+      var html = '<div class="print-area preview"><h2>입사지원서 — ' + esc(a.posting.title) + '</h2>' +
+        (photo ? '<img class="photo-print" id="d-photo" alt="증명사진">' : '') + '<dl>' + rows.map(function (x) { return '<dt>' + esc(x[0]) + '</dt><dd>' + esc(x[1] || '-') + '</dd>'; }).join('') + '</dl>' +
         itemsTable('학력', [['school', '학교'], ['major', '전공'], ['degree', '학위·과정'], ['from', '입학'], ['to', '졸업'], ['state', '구분']], d.education) +
         itemsTable('경력', [['org', '기관·회사'], ['dept', '부서'], ['title', '직위·직무'], ['from', '시작'], ['to', '종료'], ['duties', '담당 업무']], d.career) +
         itemsTable('자격사항', [['name', '자격·시험'], ['issuer', '발급기관'], ['date', '취득일']], d.certs) +
         (fc.essays || []).map(function (q, i) { return '<h3>' + (i + 1) + '. ' + esc(q.question) + '</h3><div class="consent-text">' + esc((d.essays || [])[i] || '') + '</div>'; }).join('') +
         '<h3>첨부서류</h3>' + (a.attachments.length ? '<ul class="file-list">' + a.attachments.map(function (f) {
-          var label = (docs.filter(function (x) { return x.key === f.doc_key; })[0] || {}).label || f.doc_key;
+          var label = f.doc_key === 'photo' ? '증명사진' : ((docs.filter(function (x) { return x.key === f.doc_key; })[0] || {}).label || f.doc_key);
           return '<li><span>[' + esc(label) + '] ' + esc(f.name) + ' <span class="muted small">' + RC.fileSize(f.size) + '</span></span><button class="btn small no-print" data-file="' + esc(f.id) + '">열기</button></li>';
         }).join('') + '</ul>' : '<p class="muted">없음</p>') +
         '<h3 class="no-print">처리 기록</h3><ul class="small no-print">' + a.events.map(function (e) { return '<li>' + esc(RC.kst(e.at)) + ' ' + esc(eventLabel(e.event)) + '</li>'; }).join('') + '</ul></div>' +
@@ -488,6 +494,8 @@
           if (w) { w.opener = null; w.location.href = x.url; } else location.href = x.url;
         });
       });
+      // 증명사진은 60초짜리 주소로 바로 띄운다(열람 기록이 남는다)
+      if (photo) api({ action: 'file_url', attachment_id: photo.id, inline: true }).then(function (x) { if (x.result === 'success' && $('#d-photo')) $('#d-photo').src = x.url; });
       $('#d-print').addEventListener('click', function () { window.print(); });
       if (me.super) {
         $('#d-save').addEventListener('click', function () {

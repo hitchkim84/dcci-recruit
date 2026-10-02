@@ -113,6 +113,10 @@ BEGIN
       RAISE EXCEPTION '필수 첨부서류(%)를 올려주세요.', doc ->> 'label';
     END IF;
   END LOOP;
+  IF coalesce((p.form_config -> 'photo' ->> 'use')::boolean, false) AND coalesce((p.form_config -> 'photo' ->> 'required')::boolean, false)
+     AND NOT EXISTS (SELECT 1 FROM public.attachments t WHERE t.application_id = a.id AND t.doc_key = 'photo' AND t.state = 'ready') THEN
+    RAISE EXCEPTION '증명사진을 올려주세요.';
+  END IF;
 
   IF a.status = 'submitted' THEN
     -- 이미 접수됨: 같은 내용이면(중복 클릭) 기존 접수번호를 돌려주고, 다른 내용이면 수정 허용 여부 확인
@@ -180,11 +184,18 @@ DECLARE
 BEGIN
   SELECT * INTO p FROM public.postings WHERE id = p_posting_id FOR SHARE;
   PERFORM public.rc_require_open(p);
-  IF NOT EXISTS (SELECT 1 FROM jsonb_array_elements(coalesce(p.form_config -> 'attachments', '[]'::jsonb)) d WHERE d ->> 'key' = p_doc_key) THEN
-    RAISE EXCEPTION '이 공고에서 받지 않는 서류입니다.';
+  IF p_doc_key = 'photo' THEN
+    -- 증명사진(공고 설정 photo.use일 때만): JPG·PNG, 2MB 이하
+    IF NOT coalesce((p.form_config -> 'photo' ->> 'use')::boolean, false) THEN RAISE EXCEPTION '이 공고에서 받지 않는 서류입니다.'; END IF;
+    IF v_ext NOT IN ('jpg', 'jpeg', 'png') THEN RAISE EXCEPTION '증명사진은 JPG 또는 PNG 파일만 올릴 수 있습니다.'; END IF;
+    max_mb := 2;
+  ELSE
+    IF NOT EXISTS (SELECT 1 FROM jsonb_array_elements(coalesce(p.form_config -> 'attachments', '[]'::jsonb)) d WHERE d ->> 'key' = p_doc_key) THEN
+      RAISE EXCEPTION '이 공고에서 받지 않는 서류입니다.';
+    END IF;
+    IF NOT (v_ext = ANY (public.rc_allowed_ext())) THEN RAISE EXCEPTION '올릴 수 없는 파일 형식입니다. (PDF, JPG, PNG, HWP, HWPX, DOCX)'; END IF;
+    max_mb := least(greatest(coalesce((p.form_config ->> 'max_file_mb')::int, 10), 1), 10);
   END IF;
-  IF NOT (v_ext = ANY (public.rc_allowed_ext())) THEN RAISE EXCEPTION '올릴 수 없는 파일 형식입니다. (PDF, JPG, PNG, HWP, HWPX, DOCX)'; END IF;
-  max_mb := least(greatest(coalesce((p.form_config ->> 'max_file_mb')::int, 10), 1), 10);
   IF p_size IS NULL OR p_size < 1 OR p_size > max_mb * 1048576 THEN RAISE EXCEPTION '파일은 %MB 이하만 올릴 수 있습니다.', max_mb; END IF;
 
   SELECT * INTO a FROM public.applications WHERE posting_id = p_posting_id AND user_id = uid FOR UPDATE;
@@ -192,6 +203,10 @@ BEGIN
     INSERT INTO public.applications (posting_id, user_id, email) VALUES (p_posting_id, uid, auth.jwt() ->> 'email') RETURNING * INTO a;
   END IF;
   IF NOT public.rc_app_editable(p, a) THEN RAISE EXCEPTION '제출된 지원서는 수정할 수 없습니다.'; END IF;
+  -- 증명사진은 교체 중에만 잠시 2장(새 사진을 올린 뒤 화면이 옛 사진을 지운다)
+  IF p_doc_key = 'photo' AND (SELECT count(*) FROM public.attachments WHERE application_id = a.id AND doc_key = 'photo') >= 2 THEN
+    RAISE EXCEPTION '증명사진은 1장만 올릴 수 있습니다. 기존 사진을 지운 뒤 올려주세요.';
+  END IF;
   IF (SELECT count(*) FROM public.attachments WHERE application_id = a.id AND doc_key = p_doc_key) >= 3 THEN
     RAISE EXCEPTION '서류 한 종류에 파일은 3개까지 올릴 수 있습니다.';
   END IF;
@@ -217,8 +232,9 @@ BEGIN
   IF NOT public.rc_app_editable(p, a) THEN RAISE EXCEPTION '지금은 첨부파일을 바꿀 수 없습니다.'; END IF;
   -- 제출된 지원서에서 필수 서류의 마지막 파일은 지울 수 없다(새 파일을 먼저 올린 뒤 지운다)
   IF a.status = 'submitted' AND t.state = 'ready'
-     AND EXISTS (SELECT 1 FROM jsonb_array_elements(coalesce(p.form_config -> 'attachments', '[]'::jsonb)) d
+     AND (EXISTS (SELECT 1 FROM jsonb_array_elements(coalesce(p.form_config -> 'attachments', '[]'::jsonb)) d
                   WHERE d ->> 'key' = t.doc_key AND coalesce((d ->> 'required')::boolean, false))
+          OR (t.doc_key = 'photo' AND coalesce((p.form_config -> 'photo' ->> 'required')::boolean, false)))
      AND (SELECT count(*) FROM public.attachments WHERE application_id = a.id AND doc_key = t.doc_key AND state = 'ready') <= 1 THEN
     RAISE EXCEPTION '제출된 지원서의 필수 서류입니다. 새 파일을 먼저 올린 뒤 지워주세요.';
   END IF;

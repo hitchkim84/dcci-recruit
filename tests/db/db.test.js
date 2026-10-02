@@ -392,3 +392,32 @@ test('기록 보관 일수: 365일 미만 설정 불가, 정해진 경우만 오
   r = await call(C.service, 'purge_expired');
   assert.strictEqual(r.logs, 1);
 });
+
+test('증명사진: 공고에서 켠 경우만, JPG·PNG 2MB 이하, 필수면 제출 시 확인, 서류 구분값 photo 예약', async () => {
+  const pid = '10000000-0000-4000-8000-0000000000f1';
+  await sys(`INSERT INTO public.postings (id, title, status, opens_at, closes_at, form_config, consent_text)
+             VALUES ($1, '[테스트] 사진', 'published', now() - interval '1 day', now() + interval '1 day', $2, '[테스트] 동의문')`,
+    [pid, { photo: { use: true, required: true }, attachments: [] }]);
+  const d = { basic: { name: '사진', phone: '01000000000' } };
+  // 사진을 받지 않는 공고에는 올릴 수 없다
+  await rejects(call(C.a2, 'begin_attachment', [P.edit, 'photo', 'p.jpg', 'jpg', 100]), /받지 않는 서류/);
+  await rejects(call(C.a2, 'begin_attachment', [pid, 'photo', 'p.pdf', 'pdf', 100]), /JPG 또는 PNG/);
+  await rejects(call(C.a2, 'begin_attachment', [pid, 'photo', 'p.jpg', 'jpg', 2 * 1048576 + 1]), /2MB/);
+  await rejects(call(C.a2, 'submit_application', [pid, d, true, 'h']), /증명사진을 올려주세요/);
+  const r = await call(C.a2, 'begin_attachment', [pid, 'photo', 'p.jpg', 'jpg', 1000]);
+  const chk = await call(C.service, 'attachment_for_check', [r.attachment_id, U.a2]);
+  assert.strictEqual(chk.max_bytes, 2097152, '서버 확인용 최대 크기도 2MB');
+  await call(C.service, 'finalize_attachment', [r.attachment_id, true, 1000]);
+  await call(C.a2, 'begin_attachment', [pid, 'photo', 'p2.png', 'png', 1000]);
+  await rejects(call(C.a2, 'begin_attachment', [pid, 'photo', 'p3.png', 'png', 1000]), /1장만/);
+  const s = await call(C.a2, 'submit_application', [pid, d, true, 'h']);
+  assert.match(s.receipt_no, /-0001$/);
+  // 관리자가 첨부서류 구분값으로 photo를 쓰면 거절
+  await rejects(call(C.super, 'admin_save_posting', [null, { title: 'x', opens_at: '2026-01-01T00:00:00+09:00', closes_at: '2026-01-02T00:00:00+09:00',
+    form_config: { attachments: [{ key: 'photo', label: '사진' }] } }]), /구분값/);
+  const saved = await call(C.super, 'admin_save_posting', [null, { title: '[테스트] 사진설정', opens_at: '2026-01-01T00:00:00+09:00', closes_at: '2026-01-02T00:00:00+09:00',
+    form_config: { photo: { use: true } } }]);
+  const pp = await call(C.super, 'admin_posting', [saved.id]);
+  assert.deepStrictEqual(pp.form_config.photo, { use: true, required: false });
+  await call(C.super, 'admin_delete_posting', [saved.id]);
+});

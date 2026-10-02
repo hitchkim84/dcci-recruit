@@ -77,7 +77,7 @@
       (posting.allow_cancel ? '마감 전까지 제출을 취소할 수 있습니다.' : '제출 취소는 허용되지 않습니다.') + '</p>' +
       '<div id="status-view"></div>';
     root.innerHTML = html;
-    $('#view-btn').addEventListener('click', function () { $('#status-view').innerHTML = previewHtml(a.data, a.attachments); });
+    $('#view-btn').addEventListener('click', function () { $('#status-view').innerHTML = previewHtml(a.data, a.attachments); loadPhotos(root); });
     if ($('#edit-btn')) $('#edit-btn').addEventListener('click', function () { renderForm(true); });
     if ($('#cancel-btn')) $('#cancel-btn').addEventListener('click', function () {
       if (!confirm('제출을 취소할까요?\n\n지원서는 임시저장 상태로 돌아가고 접수번호는 무효가 됩니다. 마감 전에 다시 제출하지 않으면 접수되지 않습니다.')) return;
@@ -96,6 +96,7 @@
     root.innerHTML = '<div class="notice-box warn"><strong>접수가 마감되어 제출할 수 없습니다.</strong> 이 지원서는 임시저장 상태로, 접수되지 않았습니다.</div>' +
       previewHtml(app.data, app.attachments) +
       '<div class="btn-row"><button class="btn danger" type="button" id="del-draft">임시저장 지원서 삭제</button></div>';
+    loadPhotos(root);
     $('#del-draft').addEventListener('click', deleteDraft);
   }
 
@@ -146,12 +147,35 @@
       '<button type="button" class="btn small" data-add="' + sec + '">+ ' + LABELS[sec].add + '</button></section>';
   }
 
+  function photoCfg() { return cfg().photo || {}; }
+
+  // 증명사진(공고에서 받는 경우만): JPG·PNG 2MB 이하 1장
+  function photoHtml() {
+    var pc = photoCfg();
+    if (!pc.use) return '';
+    return '<div class="doc-row" id="doc-photo"><div class="label">증명사진' + (pc.required ? '<span class="req">*</span>' : ' <span class="muted small">(선택)</span>') + '</div>' +
+      '<p class="hint">JPG 또는 PNG, 2MB 이하 1장. 새 사진을 올리면 이전 사진은 지워집니다.</p>' +
+      '<ul class="file-list" data-files="photo"></ul>' +
+      '<label class="btn small" for="file-photo">사진 선택</label>' +
+      '<input class="sr-only" type="file" id="file-photo" data-doc="photo" accept=".jpg,.jpeg,.png,image/jpeg,image/png">' +
+      '<span class="small muted" data-progress="photo"></span></div>';
+  }
+
+  // img[data-photo-id]에 60초짜리 주소를 받아 사진을 띄운다(본인 사진만)
+  function loadPhotos(root) {
+    $$('img[data-photo-id]', root).forEach(function (img) {
+      call({ action: 'file_url', attachment_id: img.getAttribute('data-photo-id'), inline: true }).then(function (r) {
+        if (r.result === 'success') img.src = r.url;
+      });
+    });
+  }
+
   function docsHtml() {
     var docs = cfg().attachments || [];
-    if (!docs.length) return '';
+    if (!docs.length && !photoCfg().use) return '';
     var maxMb = cfg().max_file_mb || 10;
-    return '<section class="form-section" id="sec-files"><h2>첨부서류</h2>' +
-      '<p class="hint">PDF, JPG, PNG, HWP, HWPX, DOCX 파일만, 파일당 ' + maxMb + 'MB 이하. 서류마다 3개까지 올릴 수 있습니다. 주민등록번호가 보이는 서류는 해당 부분을 가리고 올려주세요.</p>' +
+    return '<section class="form-section" id="sec-files"><h2>첨부서류</h2>' + photoHtml() +
+      (docs.length ? '<p class="hint">PDF, JPG, PNG, HWP, HWPX, DOCX 파일만, 파일당 ' + maxMb + 'MB 이하. 서류마다 3개까지 올릴 수 있습니다. 주민등록번호가 보이는 서류는 해당 부분을 가리고 올려주세요.</p>' : '') +
       docs.map(function (d) {
         return '<div class="doc-row" id="doc-' + esc(d.key) + '"><div class="label">' + esc(d.label) + (d.required ? '<span class="req">*</span>' : ' <span class="muted small">(선택)</span>') + '</div>' +
           '<ul class="file-list" data-files="' + esc(d.key) + '"></ul>' +
@@ -167,11 +191,16 @@
       var key = ul.getAttribute('data-files');
       var mine = list.filter(function (f) { return f.doc_key === key; });
       ul.innerHTML = mine.map(function (f) {
+        if (key === 'photo') {
+          return '<li><img class="photo-thumb" alt="올린 증명사진" data-photo-id="' + esc(f.id) + '">' +
+            '<span class="btn-row"><button type="button" class="btn small danger" data-remove-file="' + esc(f.id) + '">삭제</button></span></li>';
+        }
         return '<li><span>' + esc(f.name || ('파일.' + f.ext)) + ' <span class="muted small">' + RC.fileSize(f.size) + '</span></span>' +
           '<span class="btn-row"><button type="button" class="btn small" data-view-file="' + esc(f.id) + '">보기</button>' +
           '<button type="button" class="btn small danger" data-remove-file="' + esc(f.id) + '">삭제</button></span></li>';
       }).join('') || '<li class="muted small">올린 파일이 없습니다.</li>';
     });
+    loadPhotos(root);
   }
 
   function renderForm(editMode) {
@@ -367,8 +396,11 @@
     inputEl.value = '';
     if (!file) return;
     var prog = $('[data-progress="' + key + '"]');
-    var maxMb = cfg().max_file_mb || 10;
+    var isPhoto = key === 'photo';
+    var maxMb = isPhoto ? R.PHOTO_MAX_MB : (cfg().max_file_mb || 10);
     var ext = R.extOf(file.name);
+    var oldPhotos = isPhoto ? ((app && app.attachments) || []).filter(function (f) { return f.doc_key === 'photo'; }).map(function (f) { return f.id; }) : [];
+    if (isPhoto && R.PHOTO_EXT.indexOf(ext) < 0) { alert('증명사진은 JPG 또는 PNG 파일만 올릴 수 있습니다.'); return; }
     if (R.ALLOWED_EXT.indexOf(ext) < 0) { alert('올릴 수 없는 파일 형식입니다. (PDF, JPG, PNG, HWP, HWPX, DOCX)'); return; }
     if (file.size > maxMb * 1048576) { alert('파일은 ' + maxMb + 'MB 이하만 올릴 수 있습니다.'); return; }
     if (file.size === 0) { alert('빈 파일은 올릴 수 없습니다.'); return; }
@@ -386,8 +418,11 @@
       });
     }).then(function () {
       prog.textContent = '';
-      RC.toast('파일을 올렸습니다.');
-      return refreshFiles();
+      RC.toast(isPhoto ? '사진을 올렸습니다.' : '파일을 올렸습니다.');
+      // 새 사진이 올라간 뒤에 이전 사진을 지운다(교체)
+      return oldPhotos.reduce(function (pr, id) {
+        return pr.then(function () { return call({ action: 'remove_file', attachment_id: id }); });
+      }, Promise.resolve()).then(refreshFiles);
     }).catch(function (e) {
       prog.textContent = '';
       alert(e.message || '파일을 올리지 못했습니다.');
@@ -422,7 +457,9 @@
     if (bc.address) rows.push(['주소', b.address]);
     if (bc.military) rows.push(['병역사항', b.military]);
     if (fields().length) rows.push(['지원 분야', data.field]);
-    var html = '<div class="preview print-area"><h2>' + esc(posting.title) + '</h2><h3>기본정보</h3><dl>' +
+    var photo = photoCfg().use ? (attachments || []).filter(function (f) { return f.doc_key === 'photo'; })[0] : null;
+    var html = '<div class="preview print-area"><h2>' + esc(posting.title) + '</h2>' +
+      (photo ? '<img class="photo-print" alt="증명사진" data-photo-id="' + esc(photo.id) + '">' : '') + '<h3>기본정보</h3><dl>' +
       rows.map(function (r) { return '<dt>' + esc(r[0]) + '</dt><dd>' + esc(r[1] || '-') + '</dd>'; }).join('') + '</dl>';
     ['education', 'career', 'certs'].forEach(function (sec) {
       if (!(cfg()[sec] || {}).use) return;
@@ -453,6 +490,9 @@
       return d.required && !((app && app.attachments) || []).some(function (f) { return f.doc_key === d.key; });
     });
     if (missing.length) { setMsg('필수 첨부서류(' + esc(missing[0].label) + ')를 올려주세요.'); var el = $('#doc-' + missing[0].key); if (el) el.scrollIntoView({ block: 'center' }); return; }
+    if (photoCfg().use && photoCfg().required && !((app && app.attachments) || []).some(function (f) { return f.doc_key === 'photo'; })) {
+      setMsg('증명사진을 올려주세요.'); var pe = $('#doc-photo'); if (pe) pe.scrollIntoView({ block: 'center' }); return;
+    }
     var editMode = mode === 'edit';
     mode = 'preview';
     var formHtml = root.innerHTML;
@@ -469,6 +509,7 @@
       '<button type="button" class="btn" id="print-btn">인쇄</button>' +
       '<button type="button" class="btn primary" id="submit-btn"' + (consent ? '' : ' disabled') + '>' + (editMode ? '수정 내용 제출' : '최종 제출') + '</button></div></div></div>';
     window.scrollTo(0, 0);
+    loadPhotos(root);
     $('#print-btn').addEventListener('click', function () { window.print(); });
     $('#back-btn').addEventListener('click', function () {
       root.innerHTML = formHtml;

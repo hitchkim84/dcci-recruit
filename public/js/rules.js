@@ -9,6 +9,9 @@
     interview_fail: '면접전형 불합격', final_pass: '최종 합격', final_fail: '최종 불합격', hold: '보류'
   };
   var ALLOWED_EXT = ['pdf', 'jpg', 'jpeg', 'png', 'hwp', 'hwpx', 'docx'];
+  // 증명사진(공고 설정 photo.use일 때만, 서류 구분값 'photo'): sql/03 begin_attachment와 같은 기준
+  var PHOTO_EXT = ['jpg', 'jpeg', 'png'];
+  var PHOTO_MAX_MB = 2;
   var ITEM_KEYS = {
     education: ['school', 'major', 'degree', 'from', 'to', 'state'],
     career: ['org', 'dept', 'title', 'from', 'to', 'duties'],
@@ -90,7 +93,7 @@
     return m ? m[1].toLowerCase() : '';
   }
 
-  var R = { STAGES: STAGES, ALLOWED_EXT: ALLOWED_EXT, ITEM_KEYS: ITEM_KEYS, ITEM_MAX: ITEM_MAX, validateApplication: validateApplication, extOf: extOf };
+  var R = { STAGES: STAGES, ALLOWED_EXT: ALLOWED_EXT, PHOTO_EXT: PHOTO_EXT, PHOTO_MAX_MB: PHOTO_MAX_MB, ITEM_KEYS: ITEM_KEYS, ITEM_MAX: ITEM_MAX, validateApplication: validateApplication, extOf: extOf };
   if (typeof module !== 'undefined' && module.exports) module.exports = R;
   else root.RCRules = R;
 })(this);

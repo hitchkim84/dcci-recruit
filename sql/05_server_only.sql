@@ -27,7 +27,8 @@ END $$;
 CREATE OR REPLACE FUNCTION public.attachment_for_check(p_attachment_id uuid, p_user_id uuid) RETURNS jsonb
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
   SELECT jsonb_build_object('id', t.id, 'path', t.storage_path, 'ext', t.ext, 'state', t.state, 'declared_size', t.size_bytes,
-         'max_bytes', least(greatest(coalesce((p.form_config ->> 'max_file_mb')::int, 10), 1), 10) * 1048576)
+         'max_bytes', CASE WHEN t.doc_key = 'photo' THEN 2097152
+                           ELSE least(greatest(coalesce((p.form_config ->> 'max_file_mb')::int, 10), 1), 10) * 1048576 END)
     FROM public.attachments t
     JOIN public.applications a ON a.id = t.application_id
     JOIN public.postings p ON p.id = a.posting_id

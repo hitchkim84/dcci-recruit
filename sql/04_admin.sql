@@ -77,7 +77,7 @@ BEGIN
   FOR e IN SELECT * FROM jsonb_array_elements(coalesce(cfg -> 'attachments', '[]'::jsonb)) LOOP
     IF btrim(coalesce(e ->> 'label', '')) = '' THEN CONTINUE; END IF;
     k := coalesce(e ->> 'key', '');
-    IF k !~ '^[a-z0-9_]{1,30}$' OR k = ANY (keys) THEN RAISE EXCEPTION '첨부서류 구분값(key)은 영문 소문자·숫자·_로 서로 다르게 입력해주세요.'; END IF;
+    IF k !~ '^[a-z0-9_]{1,30}$' OR k = ANY (keys) OR k = 'photo' THEN RAISE EXCEPTION '첨부서류 구분값(key)은 영문 소문자·숫자·_로 서로 다르게 입력해주세요.'; END IF;
     IF char_length(e ->> 'label') > 50 THEN RAISE EXCEPTION '첨부서류 이름이 너무 깁니다.'; END IF;
     keys := keys || k;
     docs := docs || jsonb_build_array(jsonb_build_object('key', k, 'label', btrim(e ->> 'label'), 'required', coalesce((e ->> 'required')::boolean, false)));
@@ -89,6 +89,8 @@ BEGIN
     'education', jsonb_build_object('use', coalesce((cfg -> 'education' ->> 'use')::boolean, false), 'required', coalesce((cfg -> 'education' ->> 'required')::boolean, false)),
     'career', jsonb_build_object('use', coalesce((cfg -> 'career' ->> 'use')::boolean, false), 'required', coalesce((cfg -> 'career' ->> 'required')::boolean, false)),
     'certs', jsonb_build_object('use', coalesce((cfg -> 'certs' ->> 'use')::boolean, false), 'required', coalesce((cfg -> 'certs' ->> 'required')::boolean, false)),
+    -- 증명사진: 기본 꺼짐. [검토 필요] 채용절차법 제4조의3(직무와 무관한 용모 등 신체조건 정보 수집 금지)
+    'photo', jsonb_build_object('use', coalesce((cfg -> 'photo' ->> 'use')::boolean, false), 'required', coalesce((cfg -> 'photo' ->> 'required')::boolean, false)),
     'essays', essays, 'attachments', docs,
     'max_file_mb', least(greatest(coalesce(nullif(cfg ->> 'max_file_mb', '')::int, 10), 1), 10));
   RETURN jsonb_build_object('fields', fields, 'form_config', out_cfg);

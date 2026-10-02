@@ -145,7 +145,9 @@ const handlers = {
     if (!UUID_RE.test(str(b.attachment_id))) return fail(400, '잘못된 요청입니다.');
     const { data, error } = await rpc(ctx, 'admin_attachment', { p_attachment_id: b.attachment_id });
     if (error) return dbFail(error, 'admin_attachment');
-    const { data: s, error: e2 } = await serviceClient().storage.from(BUCKET).createSignedUrl(data.path, SIGNED_URL_SECONDS, { download: safeFileName(data.download_name) });
+    // 사진(JPG·PNG)은 화면에 바로 보이도록(inline) 주소를 만들 수 있다. 그 밖의 파일은 항상 내려받기로.
+    const inline = b.inline === true && /\.(jpe?g|png)$/i.test(data.download_name || '');
+    const { data: s, error: e2 } = await serviceClient().storage.from(BUCKET).createSignedUrl(data.path, SIGNED_URL_SECONDS, inline ? {} : { download: safeFileName(data.download_name) });
     if (e2) { console.error('createSignedUrl failed:', e2.message); return fail(500, '파일 주소를 만들지 못했습니다.'); }
     return ok({ url: s.signedUrl, expires_in: SIGNED_URL_SECONDS });
   },

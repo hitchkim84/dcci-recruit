@@ -20,6 +20,7 @@ function check(name, cond, detail) {
 }
 const kstInput = (ms) => new Date(ms + 9 * 3600e3).toISOString().slice(0, 16);
 const today = (addDays) => new Date(Date.now() + 9 * 3600e3 + addDays * 86400e3).toISOString().slice(0, 10);
+const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
 const PDF = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n');
 
 (async () => {
@@ -109,6 +110,8 @@ const PDF = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Roo
     await adminPage.fill('#p-consent', '[테스트] 개인정보 수집·이용 동의문');
     await adminPage.fill('#p-retention', today(365));
     await adminPage.check('[data-staff]');
+    await adminPage.check('#c-photo-use');
+    await adminPage.check('#c-photo-req');
     await adminPage.click('#p-save');
     await adminPage.waitForSelector('#new-posting');
     const rows = await q("SELECT id FROM public.postings WHERE title = '[테스트] 브라우저 검증 공고'");
@@ -174,7 +177,7 @@ const PDF = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Roo
     await aPage.click('#preview-btn');
     await aPage.waitForFunction(() => /필수 첨부서류/.test(document.querySelector('#form-msg').textContent));
     check('필수 첨부서류 누락 안내', true);
-    const fileInput = await aPage.$('input[type=file][data-doc]');
+    const fileInput = await aPage.$('input[type=file][data-doc]:not([data-doc=photo])');
     const dialogCount = dialogs.length;
     await fileInput.setInputFiles({ name: 'fake.pdf', mimeType: 'application/pdf', buffer: Buffer.from('this is not a pdf') });
     await aPage.waitForFunction(n => window.__d === undefined && true, dialogCount);
@@ -184,9 +187,21 @@ const PDF = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Roo
     await fileInput.setInputFiles({ name: 'exe.exe', mimeType: 'application/octet-stream', buffer: Buffer.from('MZ') });
     await aPage.waitForTimeout(300);
     check('허용하지 않는 확장자 거절', dialogs.some(m => /올릴 수 없는 파일 형식/.test(m)));
-    await (await aPage.$('input[type=file][data-doc]')).setInputFiles({ name: '이력서.pdf', mimeType: 'application/pdf', buffer: PDF });
-    await aPage.waitForFunction(() => document.querySelector('[data-files]').textContent.includes('이력서.pdf'));
+    await (await aPage.$('input[type=file][data-doc]:not([data-doc=photo])')).setInputFiles({ name: '이력서.pdf', mimeType: 'application/pdf', buffer: PDF });
+    await aPage.waitForFunction(() => document.querySelector('[data-files]:not([data-files=photo])').textContent.includes('이력서.pdf'));
     check('PDF 첨부 업로드·확인 완료', srv.mock.files.size === 1);
+    await aPage.click('#preview-btn');
+    await aPage.waitForFunction(() => /증명사진을 올려주세요/.test(document.querySelector('#form-msg').textContent));
+    check('증명사진 필수 공고: 사진 없으면 안내', true);
+    await aPage.setInputFiles('#file-photo', { name: 'photo.pdf', mimeType: 'application/pdf', buffer: PDF });
+    await aPage.waitForTimeout(300);
+    check('증명사진: JPG·PNG 외 형식 거절', dialogs.some(m => /JPG 또는 PNG/.test(m)));
+    await aPage.setInputFiles('#file-photo', { name: 'photo.png', mimeType: 'image/png', buffer: PNG });
+    await aPage.waitForFunction(() => { const i = document.querySelector('[data-files=photo] img'); return i && i.complete && i.naturalWidth > 0; });
+    await aPage.setInputFiles('#file-photo', { name: 'photo2.png', mimeType: 'image/png', buffer: PNG });
+    await aPage.waitForTimeout(1500);
+    await aPage.waitForFunction(() => document.querySelectorAll('[data-files=photo] img').length === 1);
+    check('증명사진 업로드·미리보기, 다시 올리면 교체(1장 유지)', srv.mock.files.size === 2);
     await aPage.click('#preview-btn');
     await aPage.waitForSelector('#submit-btn');
     await aPage.screenshot({ path: path.join(OUT, 'mobile-preview.png'), fullPage: true });
@@ -232,11 +247,11 @@ const PDF = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Roo
     await bPage.waitForSelector('#my-root .empty');
     check('B의 지원내역에 A의 지원서가 보이지 않음', !(await bPage.textContent('#my-root')).includes(receipt));
     const bToken = await tokenOf(bPage, 'rc-applicant');
-    const aAtt = (await q('SELECT t.id FROM public.attachments t JOIN public.applications a ON a.id = t.application_id WHERE a.posting_id = $1', [postingId]))[0].id;
+    const aAtt = (await q("SELECT t.id FROM public.attachments t JOIN public.applications a ON a.id = t.application_id WHERE a.posting_id = $1 AND t.doc_key <> 'photo'", [postingId]))[0].id;
     const steal = await apiAs('applicant', bToken, { action: 'file_url', attachment_id: aAtt });
     check('B가 A의 첨부파일 주소 요청 → 거절', steal.result === 'error' && !steal.url);
     const stealDel = await apiAs('applicant', bToken, { action: 'remove_file', attachment_id: aAtt });
-    check('B가 A의 첨부파일 삭제 요청 → 거절', stealDel.result === 'error' && srv.mock.files.size === 1);
+    check('B가 A의 첨부파일 삭제 요청 → 거절', stealDel.result === 'error' && srv.mock.files.size === 2);
     const bView = await apiAs('applicant', bToken, { action: 'my_app', posting_id: postingId });
     check('B가 같은 공고 지원서 조회 → 본인 것(없음)만', bView.result === 'success' && bView.application === null);
     const bAdmin = await apiStatus('admin', bToken, { action: 'applications', posting_id: postingId });
@@ -263,6 +278,14 @@ const PDF = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Roo
     await staffPage.click('[data-detail]');
     await staffPage.waitForSelector('.modal .print-area');
     check('담당자: 지원서 상세 조회', (await staffPage.textContent('.modal')).includes('가상대학교'));
+    await staffPage.waitForFunction(() => { const i = document.querySelector('#d-photo'); return i && i.complete && i.naturalWidth > 0; });
+    check('담당자: 지원서 상세에 증명사진 표시', true);
+    await staffPage.emulateMedia({ media: 'print' });
+    const pdfPath = path.join(OUT, 'staff-print.pdf');
+    await staffPage.pdf({ path: pdfPath, format: 'A4' });
+    await staffPage.emulateMedia({ media: 'screen' });
+    const pdfText = require('child_process').execFileSync('pdftotext', ['-layout', pdfPath, '-']).toString();
+    check('지원서 인쇄(PDF): 내용이 출력되고 관리자 메뉴는 빠짐', pdfText.includes('가상대학교') && pdfText.includes(receipt) && !pdfText.includes('기록·파기'), pdfText.slice(0, 200));
     const [resp] = await Promise.all([
       staffPage.waitForResponse(r => r.url().endsWith('/api/admin') && (r.request().postData() || '').includes('file_url')),
       staffPage.click('.modal [data-file]')
@@ -353,9 +376,9 @@ const PDF = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Roo
     await adminPage.waitForFunction(() => document.querySelector('#tab-body table') && /수동/.test(document.querySelector('#tab-body').textContent));
     const leftApps = await q('SELECT count(*)::int AS n FROM public.applications WHERE posting_id = $1', [postingId]);
     check('보관기한 지난 지원서 파기', leftApps[0].n === 0);
-    check('지원서와 함께 첨부파일도 저장소에서 삭제', srv.mock.files.size === 0);
+    check('지원서와 함께 첨부파일·사진도 저장소에서 삭제', srv.mock.files.size === 0);
     const plog = await q('SELECT * FROM public.purge_log ORDER BY run_at DESC LIMIT 1');
-    check('파기 실행 결과 기록(지원서 1건·파일 1개·실패 0)', plog[0].applications_deleted === 1 && plog[0].files_deleted === 1 && plog[0].files_failed === 0 && plog[0].ok, JSON.stringify(plog[0]));
+    check('파기 실행 결과 기록(지원서 1건·파일 2개·실패 0)', plog[0].applications_deleted === 1 && plog[0].files_deleted >= 2 && plog[0].files_failed === 0 && plog[0].ok, JSON.stringify(plog[0]));
     await adminPage.screenshot({ path: path.join(OUT, 'admin-logs.png'), fullPage: true });
 
     // ---------------------------------------------------------------- I. 데스크톱 화면 캡처·CSP

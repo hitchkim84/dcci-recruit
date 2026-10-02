@@ -30,6 +30,11 @@ npm run dev         # http://localhost:8888 에서 화면 확인 (가상 데이�
 | 제출 취소 | 공고 설정 시 마감 전 취소 → 임시저장으로 돌아가고 접수번호 무효 | 재제출 가능 |
 | 로고 | 교육 홈페이지의 대구상공회의소 로고 사본 사용 | 사용자 승인(2026-10-02) |
 
+## 3-1. 변경 이력 (운영 DB에 SQL 재실행이 필요한 것)
+| 날짜 | 변경 | 운영 DB 작업 |
+|---|---|---|
+| 2026-10-02 | 증명사진(공고별 선택, JPG·PNG 2MB 1장), 관리자 지원서 인쇄 개선 | `sql/03_applicant.sql`·`04_admin.sql`·`05_server_only.sql` 다시 실행(CREATE OR REPLACE라 안전) → `check_security.sql` |
+
 ## 4. 남은 일 (우선순위 순)
 1. **실제 환경 만들기**: `docs/SETUP.md` 순서대로 Supabase 프로젝트 → SQL 01~05 → Auth 설정(메일 템플릿 `{{ .Token }}`, SMTP, CAPTCHA) → 슈퍼관리자 계정 → Netlify 사이트·환경변수 → 도메인.
 2. **운영 확인**: `docs/OPERATIONS.md` 3장 점검표 실행 후 `docs/TEST_REPORT.md` ③열 갱신.

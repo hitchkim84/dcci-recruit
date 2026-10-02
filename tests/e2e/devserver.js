@@ -31,7 +31,7 @@ async function start(opts = {}) {
 
   // netlify.toml의 CSP를 그대로 쓰되, Supabase 주소만 흉내 서버로 바꾼다(인라인 스크립트 금지 등은 그대로 확인됨)
   const toml = fs.readFileSync(path.join(ROOT, 'netlify.toml'), 'utf8');
-  const csp = /Content-Security-Policy = "([^"]+)"/.exec(toml)[1].replace('https://*.supabase.co', mockUrl);
+  const csp = /Content-Security-Policy = "([^"]+)"/.exec(toml)[1].split('https://*.supabase.co').join(mockUrl);
   const fnCache = {};
   const web = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost');
